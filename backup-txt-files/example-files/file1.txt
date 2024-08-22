@@ -1,0 +1,7 @@
+Title: Grocery List
+
+- Apples
+- Bananas
+- Carrots
+- Eggs
+- Milk
