@@ -1,25 +1,111 @@
 #!/bin/bash
 
+readonly log_file="log.txt"
+
 ###############################################
 #                 Actions                     #
 ###############################################
 
 # Action to copy file to a specified file path
 action_copy_file() {
-  local $selected_file=${1}
+  local selected_file=${1}
   clear
-  read -p "Enter fullpath to where you want to copy file: " target_path
 
-  cp ${selected_file} ${target_path}
+  while true
+  do
+    read -p "Enter fullpath to where you want to copy file or e/E to exit: " target_path
+
+    if [[ ${target_path} == "e" || ${target_path} == "E" ]]; then
+      return
+    fi
+
+    if [[ ! -d "${target_path}" ]]; then
+      echo "Invalid path. Please enter a valid directory."
+      continue
+    fi
+
+    if [[ -e "${target_path}/$(basename "${selected_file}")" ]]; then
+      read -p "File already exists at target location. Overwrite? (Y/N): " overwrite
+      if [[ ${overwrite} != "Y" && ${overwrite} != "y" ]]; then
+        continue
+      fi
+    fi
+
+    cp "${selected_file}" "${target_path}"
+    local result=$?
+
+    if [ ${result} -eq 0 ]; then
+      action_log_to_file "${selected_file} copied to ${target_path}"
+      return
+    fi
+
+    clear
+    echo "Failed to copy file, please try again!"
+    action_log_to_file "Failed to copy ${selected_file} to ${target_path}, Error: ${result}"
+  done
 }
 
 # Action to move file to a specified file path
 action_move_file() {
-  local $selected_file=${1}
+  local selected_file=${1}
   clear
-  read -p "Enter fullpath to where you want to move file: " target_path
 
-  mv ${selected_file} ${target_path}
+  while true
+  do
+    read -p "Enter fullpath to where you want to move file or e/E to exit: " target_path
+
+    if [[ ${target_path} == "e" || ${target_path} == "E" ]]; then
+      return
+    fi
+
+    if [[ ! -d "${target_path}" ]]; then
+      echo "Invalid path. Please enter a valid directory."
+      continue
+    fi
+
+    if [[ -e "${target_path}/$(basename "${selected_file}")" ]]; then
+      read -p "File already exists at target location. Overwrite? (Y/N): " overwrite
+      if [[ ${overwrite} != "Y" && ${overwrite} != "y" ]]; then
+        continue
+      fi
+    fi
+
+    mv "${selected_file}" "${target_path}"
+    local result=$?
+
+    if [ ${result} -eq 0 ]; then
+      action_log_to_file "${selected_file} moved to ${target_path}"
+      return
+    fi
+
+    clear
+    echo "Failed to move file, please try again!"
+    action_log_to_file "Failed to move ${selected_file} to ${target_path}, Error: ${result}"
+  done
+}
+
+action_delete_file() {
+  local selected_file=${1}
+  clear
+  
+  while true
+  do
+    rm "${selected_file}"
+    local result=$?
+
+    if [ ${result} -eq 0 ]; then
+      action_log_to_file "${selected_file} removed"
+      return
+    fi
+
+    clear
+    read -p "Failed to remove file, do you want to try again? (Y/N): " try_again
+    action_log_to_file "Failed to move ${selected_file}, Error: ${result}"
+
+    if [ ${try_again} == "n" || ${try_again} == "N" ]; then
+      return
+    fi
+  done
 }
 
 # Action to ask what to do with a selected file
@@ -46,7 +132,7 @@ action_ask_for_file_action() {
         return
         ;;
       "d"|"D")
-        rm ${selected_file}
+        action_delete_file ${selected_file}
         return
         ;;
       "e"|"E")
@@ -96,25 +182,29 @@ action_select_file () {
       return
     fi
 
-    local selected_file=${files[$file_input - 1]}
+    if [[ ${file_input} -ge 1 && ${file_input} -le ${#files[@]} ]]; then
+      local selected_file=${files[$file_input - 1]}
 
-    echo $selected_file
-    local filename=$(basename -- "${selected_file}")
-    local extension="${filename##*.}"
+      echo $selected_file
+      local filename=$(basename -- "${selected_file}")
+      local extension="${filename##*.}"
 
-    case ${extension} in
-      "txt")
-        action_handle_txt_file $selected_file
-        return
-        ;;
-      "png"|"jpg"|"jpeg")
-        action_handle_image_file $selected_file
-        return
-        ;;
-      *)
-        echo "Incorrect input, try again!"
-        ;;
-    esac
+      case ${extension} in
+        "txt")
+          action_handle_txt_file $selected_file
+          return
+          ;;
+        "png"|"jpg"|"jpeg")
+          action_handle_image_file $selected_file
+          return
+          ;;
+        *)
+          echo "Unsupported file type, try again!"
+          ;;
+      esac
+    else
+      echo "Invalid selection, try again!"
+    fi
   done
 
   ask_for_keypress
@@ -190,6 +280,11 @@ action_list_files_with_filter () {
         ;;
     esac
   done
+}
+
+action_log_to_file() {
+  local datetime_now=$(date "+%Y-%m-%d %H:%M:%S")
+  echo "[${datetime_now}] ${1}" >> ${log_file}
 }
 
 ###############################################
