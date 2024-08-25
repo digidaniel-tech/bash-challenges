@@ -85,9 +85,9 @@ action_copy_file() {
 
   while true
   do
-    read -p "Enter fullpath to where you want to copy file or e/E to exit: " target_path
+    read -p "Enter fullpath to where you want to copy file or q/Q to quit: " target_path
 
-    if [[ ${target_path} == "e" || ${target_path} == "E" ]]; then
+    if [[ ${target_path} == "q" || ${target_path} == "Q" ]]; then
       return
     fi
 
@@ -124,9 +124,9 @@ action_move_file() {
 
   while true
   do
-    read -p "Enter fullpath to where you want to move file or e/E to exit: " target_path
+    read -p "Enter fullpath to where you want to move file or q/Q to quit: " target_path
 
-    if [[ ${target_path} == "e" || ${target_path} == "E" ]]; then
+    if [[ ${target_path} == "q" || ${target_path} == "Q" ]]; then
       return
     fi
 
@@ -199,14 +199,17 @@ action_handle_deleted_file () {
 
   while true
   do
-    printf "R) Restore file\n"
-
-    echo
+    echo "R) Restore file"
+    echo "Q) Quit"
+    print_separator
     read -p "What do you want to do with the file?: " prompt_input
 
     case ${prompt_input} in
       "r"|"R")
         action_restore_from_trash "${selected_file}"
+        return
+        ;;
+      "q"|"Q")
         return
         ;;
       *)
@@ -222,13 +225,12 @@ action_handle_existing_file () {
 
   while true
   do
-    printf "C) Copy\n"
-    printf "M) Move\n"
-    printf "D) Delete file\n"
-    printf "Z) Compress file\n"
-    printf "E) Exit\n"
-
-    echo
+    echo "C) Copy"
+    echo "M) Move"
+    echo "D) Delete file"
+    echo "Z) Compress file"
+    echo "Q) Quit"
+    print_separator
     read -p "What do you want to do with the file?: " prompt_input
 
     case ${prompt_input} in
@@ -248,7 +250,7 @@ action_handle_existing_file () {
         action_zip_file "${selected_file}"
         return
         ;;
-      "e"|"E")
+      "q"|"Q")
         return
         ;;
       *)
@@ -300,9 +302,9 @@ action_select_file () {
 
   while true
   do
-    read -p "Select file to work with, or e/E to exit: " file_input
+    read -p "Select file to work with, or q/Q to quit: " file_input
 
-    if [[ ${file_input} == "e" || ${file_input} == "E" ]]; then
+    if [[ ${file_input} == "q" || ${file_input} == "Q" ]]; then
       return
     fi
 
@@ -381,10 +383,10 @@ action_list_files_with_filter () {
   do
     echo "Filter file list based on file type (ex. .txt, .png, .jpg)"
     echo
-    read -p "Enter file type or e/E to exit: " file_input
+    read -p "Enter file type or q/Q to quit: " file_input
 
     # Makes it possible to exit without enter file type
-    if [[ ${file_input} == "e" || ${file_input} == "E" ]]; then
+    if [[ ${file_input} == "q" || ${file_input} == "Q" ]]; then
       return
     fi
 
@@ -419,12 +421,6 @@ action_log_to_file() {
 #                   UI                        #
 ###############################################
 
-print_ui () {
-  for selection in "${@}"; do
-    echo "${selection}"
-  done
-}
-
 print_separator () {
   local length=${1}
   printf "=%.0s" $(seq 1 ${length:-45})
@@ -440,13 +436,14 @@ print_main_menu () {
   # Clear screen to prevent cluter
   clear
 
-  print_ui "l) List all files" \
-"f) Filter on file type" \
-"t) Show files in trash" \
-"e) Exit" \
-"What do you want to do?"
-
-  read selection_input
+  echo "Main menu"
+  print_separator
+  echo "L) List all files"
+  echo "F) Filter on file type"
+  echo "T) Show files in trash"
+  echo "Q) Quit"
+  print_separator
+  read -p "What do you want to do?: " selection_input
 
   case ${selection_input} in
     "l"|"L")
@@ -458,7 +455,7 @@ print_main_menu () {
     "t"|"T")
       action_show_files_in_trash
       ;;
-    "e"|"E")
+    "q"|"Q")
       exit 0
       ;;
   esac
