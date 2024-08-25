@@ -1,14 +1,86 @@
 #!/bin/bash
 
 readonly log_file="log.txt"
+readonly trash_path="/tmp/trash/"
 
 ###############################################
 #                 Actions                     #
 ###############################################
 
+# Action to make sure path exists
+action_make_sure_path_exists() {
+  if [ ! -d "${1}" ]; then
+    # Create path if it doesn't exist
+    mkdir -p "${1}"
+  fi
+}
+
+# Action to restore file from trash
+action_restore_from_trash() {
+  local selected_file="${1}"
+  clear
+
+  while true
+  do
+    action_make_sure_path_exists "${folder_path}"
+    mv "${selected_file}" "${folder_path}"
+    local result=$?
+
+    if [ $result -eq 0 ]; then
+      action_log_to_file "${selected_file} restored"
+      return
+    else
+      action_log_to_file "Failed to restore ${selected_file}, Error: ${result}"
+      read -p "Failed to restore file from trash, do you want to try again? (Y/N)" try_again
+      if [[ ${try_again} == "N" || ${try_again} == "n" ]]; then
+        return
+      fi
+    fi
+  done
+}
+
+# Action to show files in trash
+action_show_files_in_trash() {
+  action_make_sure_path_exists "${trash_path}"
+  action_list_files "${trash_path}"
+}
+
+# Action to zip selected file
+action_zip_file() {
+  local selected_file="${1}"
+  local zip_file="${selected_file}.zip"
+
+  if [ -e "${zip_file}" ]; then
+    read -p "Archive already exists. Overwrite? (Y/N): " overwrite
+    if [[ ${overwrite} != "Y" && ${overwrite} != "y" ]]; then
+      return
+    fi
+  fi
+
+  while true
+  do
+    zip "${zip_file}" "${selected_file}"
+    local result=$?
+
+    if [ ${result} -eq 0 ]; then
+      echo "${selected_file} compressed into ${zip_file}"
+      action_log_to_file "${selected_file} compressed into ${zip_file}"
+      ask_for_keypress  
+      return
+    else
+      action_log_to_file "Failed to compress ${selected_file}, Error: ${result}"
+      read -p "Failed to compress ${selected_file}, do you want to try again (Y/N)?" try_again
+
+      if [[ ${try_again} == "n" || ${try_again} == "N" ]]; then
+        return
+      fi
+    fi
+  done
+}
+
 # Action to copy file to a specified file path
 action_copy_file() {
-  local selected_file=${1}
+  local selected_file="${1}"
   clear
 
   while true
@@ -47,7 +119,7 @@ action_copy_file() {
 
 # Action to move file to a specified file path
 action_move_file() {
-  local selected_file=${1}
+  local selected_file="${1}"
   clear
 
   while true
@@ -84,13 +156,15 @@ action_move_file() {
   done
 }
 
+# Action to delete file
 action_delete_file() {
-  local selected_file=${1}
+  local selected_file="${1}"
   clear
   
   while true
   do
-    rm "${selected_file}"
+    action_make_sure_path_exists "${folder_path}"
+    mv "${selected_file}" "${trash_path}"
     local result=$?
 
     if [ ${result} -eq 0 ]; then
@@ -110,13 +184,48 @@ action_delete_file() {
 
 # Action to ask what to do with a selected file
 action_ask_for_file_action() {
-  local selected_file=${1}
+  local selected_file="${1}"
+
+  if [[ "${selected_file}" == ${trash_path}* ]]; then
+    action_handle_deleted_file "${selected_file}"
+  else
+    action_handle_existing_file "${selected_file}"
+  fi
+}
+
+# Action to handle files in trash
+action_handle_deleted_file () {
+  local selected_file="${1}"
+
+  while true
+  do
+    printf "R) Restore file\n"
+
+    echo
+    read -p "What do you want to do with the file?: " prompt_input
+
+    case ${prompt_input} in
+      "r"|"R")
+        action_restore_from_trash "${selected_file}"
+        return
+        ;;
+      *)
+        echo "Incorrect input, try again!"
+        ;;
+    esac
+  done
+}
+
+# Action to handle files that not in trash
+action_handle_existing_file () {
+  local selected_file="${1}"
 
   while true
   do
     printf "C) Copy\n"
     printf "M) Move\n"
     printf "D) Delete file\n"
+    printf "Z) Compress file\n"
     printf "E) Exit\n"
 
     echo
@@ -124,15 +233,19 @@ action_ask_for_file_action() {
 
     case ${prompt_input} in
       "c"|"C")
-        action_copy_file ${selected_file}
+        action_copy_file "${selected_file}"
         return
         ;;
       "m"|"M")
-        action_move_file ${selected_file}
+        action_move_file "${selected_file}"
         return
         ;;
       "d"|"D")
-        action_delete_file ${selected_file}
+        action_delete_file "${selected_file}"
+        return
+        ;;
+      "z"|"Z")
+        action_zip_file "${selected_file}"
         return
         ;;
       "e"|"E")
@@ -147,27 +260,38 @@ action_ask_for_file_action() {
 
 # Action to handle txt file
 action_handle_txt_file () {
-  local selected_file=${1}
+  local selected_file="${1}"
 
   clear
   echo "Content of [${selected_file}]"
   print_separator
-  local content=$(cat ${selected_file})
+  local content=$(cat "${selected_file}")
 
   echo ${content}
   print_separator
-  action_ask_for_file_action $selected_file
+  action_ask_for_file_action "$selected_file"
 }
 
 # Action to handle image files
 action_handle_image_file () {
-  local selected_file=${1}
+  local selected_file="${1}"
 
   clear
   echo "This is an image, preview is not possible"
 
   print_separator
-  action_ask_for_file_action $selected_file
+  action_ask_for_file_action "$selected_file"
+}
+
+# Action to handle compressed files
+action_handle_zip_file() {
+  local selected_file="${1}"
+
+  clear
+  echo "This is an compressed file, preview is not possible"
+
+  print_separator
+  action_ask_for_file_action "$selected_file"
 }
 
 # Action to select a file from the file list
@@ -185,17 +309,21 @@ action_select_file () {
     if [[ ${file_input} -ge 1 && ${file_input} -le ${#files[@]} ]]; then
       local selected_file=${files[$file_input - 1]}
 
-      echo $selected_file
+      echo "$selected_file"
       local filename=$(basename -- "${selected_file}")
       local extension="${filename##*.}"
 
       case ${extension} in
         "txt")
-          action_handle_txt_file $selected_file
+          action_handle_txt_file "$selected_file"
           return
           ;;
         "png"|"jpg"|"jpeg")
-          action_handle_image_file $selected_file
+          action_handle_image_file "$selected_file"
+          return
+          ;;
+        "zip")
+          action_handle_zip_file "$selected_file"
           return
           ;;
         *)
@@ -223,10 +351,10 @@ action_list_files () {
   fi
 
   # Read folder path and removed trailing slashes
-  local folder_path="$(echo "$1" | sed 's:/*$::')"
-  mapfile -t files < <(find "${folder_path}/" -maxdepth 1 -type f -name "*${filter}" | sort -V)
+  local path_to_files="$(echo "$1" | sed 's:/*$::')"
+  mapfile -t files < <(find "${path_to_files}/" -maxdepth 1 -type f -name "*${filter}" | sort -V)
   # Informs users in what folder we are searching
-  echo "File in [${folder_path}/]:"
+  echo "File in [${path_to_files}/]:"
   print_separator
 
    # Check if folder is empty
@@ -284,7 +412,7 @@ action_list_files_with_filter () {
 
 action_log_to_file() {
   local datetime_now=$(date "+%Y-%m-%d %H:%M:%S")
-  echo "[${datetime_now}] ${1}" >> ${log_file}
+  echo "[${datetime_now}] ${1}" >> "${log_file}"
 }
 
 ###############################################
@@ -312,21 +440,25 @@ print_main_menu () {
   # Clear screen to prevent cluter
   clear
 
-  print_ui "1) List all files" \
-"2) Filter on file type" \
-"3) Exit" \
+  print_ui "l) List all files" \
+"f) Filter on file type" \
+"t) Show files in trash" \
+"e) Exit" \
 "What do you want to do?"
 
   read selection_input
 
   case ${selection_input} in
-    1)
-      action_list_files ${folder_path}
+    "l"|"L")
+      action_list_files "${folder_path}"
       ;;
-    2)
-      action_list_files_with_filter ${folder_path}
+    "f"|"F")
+      action_list_files_with_filter "${folder_path}"
       ;;
-    3)
+    "t"|"T")
+      action_show_files_in_trash
+      ;;
+    "e"|"E")
       exit 0
       ;;
   esac
@@ -334,13 +466,13 @@ print_main_menu () {
   printf "\n\n"
 }
 
-folder_path=${1}
+readonly folder_path="${1}"
 
 #####################################################
 #                 Main program                      #
 #####################################################
 
-if [[ -z ${folder_path} ]]; then
+if [[ -z "${folder_path}" ]]; then
   echo "No folder path specified, please enter an existing folder path."
   exit 2
 fi
