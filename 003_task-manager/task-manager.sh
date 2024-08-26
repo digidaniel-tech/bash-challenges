@@ -20,6 +20,7 @@ ui_ask_to_try_again () {
 
 ui_print_tasks () {
   clear
+  action_cleanup_taskfile
   mapfile -t tasks < "${taskfile}"
   local show_index=${1:-false}
 
@@ -35,6 +36,11 @@ ui_print_tasks () {
     done
   fi
 }
+
+action_cleanup_taskfile () {
+  sed -i '/^[[:space:]]*$/d' "$taskfile"
+}
+
 
 action_log_to_file () {
   local message="${1}"
@@ -92,10 +98,27 @@ action_add_new_task () {
     return
   fi
 
-  local date=$(date +"%Y-%m-%d")
-  local status="Pending"
+  while true;
+  do
+    read -p "Enter a deadline for task or empty to quit (format: 12/31/2024): " deadline
 
-  echo "${task} | ${date} | ${status}" >> "${taskfile}"
+    if [[ ! "${deadline}" =~ ^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$ ]]; then
+      echo "Date ${deadline} is not a valid datetime format, try again"
+      continue
+    fi
+
+    # Validate date that the date input is an valid date
+    date -d "${deadline}" 2> /dev/null
+    local result=$?
+
+    if [[ ${result} -gt 0 ]]; then
+      echo "Date ${deadline} is not a valid date"
+      continue
+    else
+      echo "${task} | ${deadline} | Pending" >> "${taskfile}"
+      return
+    fi
+  done
 }
 
 action_view_all_tasks () {
@@ -114,7 +137,7 @@ action_mark_task_as_completed () {
       echo "${selected_task} is not a valid selection"
       continue
     else
-      sed -i "${selected_task}s/Pending/Completed/" ${taskfile}
+      sed -i "${selected_task}s/Pending/Completed/" "${taskfile}"
       local result=$?
 
       local task=${tasks[$selected_task-1]}
@@ -147,7 +170,7 @@ action_remove_task () {
       echo "${selected_task} is not a valid selection"
       continue
     else
-      sed -i "${selected_task}s/.*//" ${taskfile}
+      sed -i "${selected_task}s/.*//" "${taskfile}"
       local result=$?
 
       local task=${tasks[$selected_task-1]}
