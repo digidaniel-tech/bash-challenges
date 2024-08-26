@@ -27,7 +27,7 @@ ui_print_tasks () {
   if [[ ${#tasks} -eq 0 ]]; then
     echo "There is not tasks to be shown, add a task to get going"
   else
-    for (( i = 0; i < "${#tasks[@]}"; ++i )); do
+    for (( i = 0; i < "${#tasks[@]}"; i++ )); do
       if [[ ${show_index} == true ]]; then
         printf "${i+1}) "
       fi
@@ -127,69 +127,62 @@ action_view_all_tasks () {
 }
 
 action_mark_task_as_completed () {
+  action_manipulate_task "complete" complete_task
+}
+
+action_remove_task () {
+  action_manipulate_task "remove" remove_task
+}
+
+action_manipulate_task () {
+  local action=${1}
+  local operation=${2}
+
   ui_print_tasks true
   mapfile -t tasks < "${taskfile}"
 
   while true
   do
-    read -p "Select task to mark as completed: " selected_task
+    read -p "Select task to ${action}: " selected_task
     if [[ ${selected_task} -gt ${#tasks[@]} || ${selected_task} -le 0 ]]; then
       echo "${selected_task} is not a valid selection"
       continue
     else
-      sed -i "${selected_task}s/Pending/Completed/" "${taskfile}"
+      $operation "${selected_task}"
       local result=$?
 
       local task=${tasks[$selected_task-1]}
       local task_name=$(extract_task_name ${task})
 
       if [[ ${result} -gt 0 ]]; then
-        echo "Failed to set task ${task_name} as completed"
-        action_log_to_file "Failed to set task ${task_name} as completed"
+        echo "Task ${task_name} failed to be ${action}ed"
+        action_log_to_file "Task ${task_name} failed to be ${action}ed"
         ui_ask_to_try_again
-        continue
+        
+        local tryagain=$?
+      
+        if [[ "${tryagain}" -eq 0 ]]; then
+          return
+        else
+          continue
+        fi
       fi
 
       clear
-      echo "Task ${task_name} was marked as completed"
-      action_log_to_file "Task ${task_name} was marked as completed"
+      echo "Task ${task_name} was ${action}ed"
+      action_log_to_file "Task ${task_name} was ${action}ed"
       read -p "Press any key to continue.."
       return
     fi
   done
 }
 
-action_remove_task () {
-  ui_print_tasks true
-  mapfile -t tasks < "${taskfile}"
+complete_task () {
+  sed -i "${1}s/Pending/Completed/" "${taskfile}"
+}
 
-  while true
-  do
-    read -p "Select task to remove: " selected_task
-    if [[ ${selected_task} -gt ${#tasks[@]} || ${selected_task} -le 0 ]]; then
-      echo "${selected_task} is not a valid selection"
-      continue
-    else
-      sed -i "${selected_task}s/.*//" "${taskfile}"
-      local result=$?
-
-      local task=${tasks[$selected_task-1]}
-      local task_name=$(extract_task_name ${task})
-
-      if [[ ${result} -gt 0 ]]; then
-        echo "Failed to remove task ${task_name}"
-        action_log_to_file "Failed to remove task ${task_name}"
-        ui_ask_to_try_again
-        continue
-      fi
-
-      clear
-      echo "Task ${task_name} was removed"
-      action_log_to_file "Task ${task_name} was removed"
-      read -p "Press any key to continue.."
-      return
-    fi
-  done
+remove_task () {
+  sed -i "${1}s/.*//" "${taskfile}"
 }
 
 extract_task_name () {
