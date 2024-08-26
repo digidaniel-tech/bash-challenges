@@ -29,7 +29,7 @@ ui_print_tasks () {
   else
     for (( i = 0; i < "${#tasks[@]}"; i++ )); do
       if [[ ${show_index} == true ]]; then
-        printf "${i+1}) "
+        printf "$((i + 1))) "
       fi
 
       echo "${tasks[$i]}"
@@ -101,6 +101,10 @@ action_add_new_task () {
   while true;
   do
     read -p "Enter a deadline for task or empty to quit (format: 12/31/2024): " deadline
+
+    if [[ -z "${deadline}" ]]; then
+      return
+    fi
 
     if [[ ! "${deadline}" =~ ^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$ ]]; then
       echo "Date ${deadline} is not a valid datetime format, try again"
@@ -216,6 +220,10 @@ main_menu () {
     ;;
   5)
     exit 0
+    ;;
+  *)
+    echo "Invalid selection. Please try again!"
+    read -p "Press any key to continue..."
     ;;
   esac
 }
