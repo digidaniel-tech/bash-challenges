@@ -83,7 +83,7 @@ action_delete_password() {
   done
 
   grep -vF "${password_item}" "${password_file}" > "${password_file}" > /dev/null
-  
+
   echo "Password for ${service} has been removed."
   action_log_to_file "Password for ${service} removed"
 
@@ -130,6 +130,13 @@ ui_list_passwords () {
   local action_command=${2}
 
   mapfile -t < "${password_file}" passwords
+
+  clear
+  if [[ ${#passwords[@]} -le 0 ]]; then
+    echo "There is not passwords stored, please add one."
+    read -p "Press any key to continue..."
+    return
+  fi
 
   for ((i = 0; i < ${#passwords[@]}; ++i)) {
     local password_item=${passwords[$i]}
