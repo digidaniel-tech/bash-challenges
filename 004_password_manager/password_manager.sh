@@ -248,6 +248,86 @@ action_generate_password () {
   echo "${random_password::-2}"
 }
 
+action_check_password_strength() {
+  local password_item="$1"
+  local encrypted_password=$(action_get_password_property "${password_item}" "password")
+
+  read -p "Enter your master password or empty to exit: " master_password
+  if [[ -z "${master_password}" ]]; then
+    return
+  fi
+
+  local decrypted_password=$(action_decrypt_password "${encrypted_password}" "${master_password}")
+  if [[ "${decrypted_password}" == "" ]]; then
+    local service=$(action_get_password_property "${password_item}" "service")
+    echo "Failed to decrypt your password"
+    action_log_to_file "Failed to decrypt password for ${service}"
+
+    ui_ask_to_try_again
+    local try_again=$?
+    if [[ ${try_again} -eq 0 ]]; then
+      return
+    else
+      continue
+    fi
+  fi
+
+  local score=0
+  local length=${#password}
+
+  if [ $length -ge 8 ]; then
+    ((score++))
+  fi
+
+  if [[ "$password" =~ [a-z] ]]; then
+    ((score++))
+  fi
+
+  if [[ "$password" =~ [A-Z] ]]; then
+    ((score++))
+  fi
+
+  if [[ "$password" =~ [0-9] ]]; then
+    ((score++))
+  fi
+
+  if [[ "$password" =~ [^a-zA-Z0-9] ]]; then
+    ((score++))
+  fi
+
+  if [[ -f /usr/share/dict/words ]]; then
+    if grep -q -w "$password" /usr/share/dict/words; then
+      echo "Password contains a common word, consider making it more complex."
+    fi
+  else
+    local common_words=("password" "123456" "qwerty" "abc123")
+
+    for word in "${common_words[@]}"; do
+      if [[ "$password" == *"$word"* ]]; then
+        echo "Password contains a common word: '$word', consider making it more complex."
+        score=0
+      fi
+    done
+  fi
+
+  case $score in
+    5)
+      echo "Strong password!"
+      ;;
+    4)
+      echo "Moderately strong password."
+      ;;
+    3)
+      echo "Weak password."
+      ;;
+    *)
+      echo "Very weak password."
+      ;;
+  esac
+
+  read -p "Press any key to continue..."
+}
+
 main_menu () {
   while true
   do
@@ -256,7 +336,8 @@ main_menu () {
     echo "2) View Password"
     echo "3) Delete Password"
     echo "4) Generate Strong Password"
-    echo "5) Exit"
+    echo "5) Check strength of password"
+    echo "6) Exit"
     read -p "What du you want to do?: " menu_selection
 
     case ${menu_selection} in
@@ -264,7 +345,8 @@ main_menu () {
       2) ui_list_passwords "show" action_show_password ;;
       3) ui_list_passwords "delete" action_delete_password ;;
       4) ui_generate_password ;;
-      5) exit 0;;
+      5) ui_list_passwords "rate" action_check_password_strength ;;
+      6) exit 0;;
       *)
         echo "Invalid selection, please try again!"
         read -p "Press any key to continue..."
