@@ -7,9 +7,9 @@ ui_ask_to_try_again () {
   while true
   do
     read -p "Do you want to try again (Y/N)?: " try_again
-    if [[ "${try_again}" =~ ^nN$ ]]; then
+    if [[ "${try_again}" =~ ^[nN]$ ]]; then
       return 0
-    elif [[ "${try_again}" =~ ^yY$ ]]; then
+    elif [[ "${try_again}" =~ ^[yY]$ ]]; then
       return 1
     fi
 
@@ -65,10 +65,36 @@ action_log_to_file () {
   echo "[${datetime_now}] ${log}" >> "$log_file"
 }
 
-action_show_password () {
+action_delete_password() {
+  local password_item=${1}
+  local service=$(action_get_password_property "${password_item}" "service")
+
   while true
   do
-    local password_item=${1}
+    read -p "Are you sure you want to remove password for ${service} (Y/N)?: " confirm_delete
+
+    if [[ "${confirm_delete}" =~ ^[Nn]$ ]]; then
+      return
+    elif [[ "${confirm_delete}" =~ ^[Yy]$ ]]; then
+      break
+    else
+      echo "Invalid selection, try again."
+    fi
+  done
+
+  grep -vF "${password_item}" "${password_file}" > "${password_file}" > /dev/null
+  
+  echo "Password for ${service} has been removed."
+  action_log_to_file "Password for ${service} removed"
+
+  read -p "Press any key to continue..."
+}
+
+action_show_password () {
+  local password_item=${1}
+
+  while true
+  do
     local encrypted_password=$(action_get_password_property "${password_item}" "password")
 
     read -p "Enter your master password or empty to exit: " master_password
@@ -228,8 +254,8 @@ main_menu () {
 
     case ${menu_selection} in
       1) ui_add_password ;;
-      2) ui_list_passwords "show" action_show_password;;
-      3) ;;
+      2) ui_list_passwords "show" action_show_password ;;
+      3) ui_list_passwords "delete" action_delete_password ;;
       4) ui_generate_password ;;
       5) exit 0;;
       *)
