@@ -17,13 +17,6 @@ ui_ask_to_try_again () {
   done
 }
 
-action_log_to_file () {
-  local datetime_now=$(date +"%Y-%m-%d %H:%M:%S")
-  local log=${1}
-
-  echo "[${datetime_now}] ${log}" >> "$log_file"
-}
-
 ui_add_password () {
   while true
   do
@@ -63,6 +56,13 @@ ui_generate_password () {
   local generated_password=$(action_generate_password)
   echo "Your password is: ${generated_password}"
   read -p "Press any key to continue..."
+}
+
+action_log_to_file () {
+  local datetime_now=$(date +"%Y-%m-%d %H:%M:%S")
+  local log=${1}
+
+  echo "[${datetime_now}] ${log}" >> "$log_file"
 }
 
 action_show_password () {
